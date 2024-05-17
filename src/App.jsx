@@ -20,6 +20,9 @@ import {
   useBoolean,
   useToast,
   VStack,
+  Divider,
+  List,
+  ListItem,
 } from '@chakra-ui/react';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { diff } from 'react-syntax-highlighter/dist/esm/languages/hljs';
@@ -225,6 +228,24 @@ export const App = () => {
             ></Textarea>
           </GridItem>
         </Grid>
+        <Divider />
+        <List fontSize="smaller" listStyleType="disc">
+          <ListItem>
+            Github:{' '}
+            <Link href="https://github.com/josephj/gh-pr-reviewer" isExternal>
+              https://github.com/josephj/gh-pr-reviewer
+            </Link>
+          </ListItem>
+          <ListItem>
+            Model:{' '}
+            <Link
+              href="https://huggingface.co/josephj6802/codereviewer"
+              isExternal
+            >
+              https://huggingface.co/josephj6802/codereviewer
+            </Link>
+          </ListItem>
+        </List>
       </VStack>
     </Center>
   );
