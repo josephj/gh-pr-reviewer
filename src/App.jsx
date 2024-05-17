@@ -1,126 +1,225 @@
-import { useEffect, useRef, useState } from 'react'
-import LanguageSelector from './components/LanguageSelector';
+import { useEffect, useRef, useState } from 'react';
 import Progress from './components/Progress';
+import { useForm } from 'react-hook-form';
+import {
+  Button,
+  Box,
+  Center,
+  FormControl,
+  FormHelperText,
+  FormLabel,
+  Grid,
+  GridItem,
+  Heading,
+  Input,
+  Link,
+  Stack,
+  Textarea,
+  useBoolean,
+  useToast,
+  VStack,
+} from '@chakra-ui/react';
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { diff } from 'react-syntax-highlighter/dist/esm/languages/hljs';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
-import './App.css'
+SyntaxHighlighter.registerLanguage('diff', diff);
 
-function App() {
+import { fetchDetails } from './utils.js';
 
-  // Model loading
-  const [ready, setReady] = useState(null);
-  const [disabled, setDisabled] = useState(false);
+export const App = () => {
+  const [isModelReady, setModelReady] = useState(null);
+  const [isModelLoading, setModelLoading] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
+  const [isSubmitting, setSubmitting] = useBoolean();
+
+  const { register, handleSubmit, setValue } = useForm();
+
+  const toast = useToast();
 
   // Inputs and outputs
-  const [input, setInput] = useState('I love walking my dog.');
-  const [sourceLanguage, setSourceLanguage] = useState('eng_Latn');
-  const [targetLanguage, setTargetLanguage] = useState('fra_Latn');
+  const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
 
-  // Create a reference to the worker object.
   const worker = useRef(null);
-
-  // We use the `useEffect` hook to setup the worker as soon as the `App` component is mounted.
   useEffect(() => {
     if (!worker.current) {
-      // Create the worker if it does not yet exist.
       worker.current = new Worker(new URL('./worker.js', import.meta.url), {
-        type: 'module'
+        type: 'module',
       });
     }
-
-    // Create a callback function for messages from the worker thread.
     const onMessageReceived = (e) => {
       switch (e.data.status) {
         case 'initiate':
-          // Model file start load: add a new progress item to the list.
-          setReady(false);
-          setProgressItems(prev => [...prev, e.data]);
+          setModelReady(false);
+          setProgressItems((prev) => [...prev, e.data]);
           break;
-
         case 'progress':
-          // Model file progress: update one of the progress items.
-          setProgressItems(
-            prev => prev.map(item => {
+          setProgressItems((prev) =>
+            prev.map((item) => {
               if (item.file === e.data.file) {
-                return { ...item, progress: e.data.progress }
+                return { ...item, progress: e.data.progress };
               }
               return item;
             })
           );
           break;
-
         case 'done':
-          // Model file loaded: remove the progress item from the list.
-          setProgressItems(
-            prev => prev.filter(item => item.file !== e.data.file)
+          setProgressItems((prev) =>
+            prev.filter((item) => item.file !== e.data.file)
           );
           break;
-
         case 'ready':
-          // Pipeline ready: the worker is ready to accept messages.
-          setReady(true);
+          setModelReady(true);
           break;
-
         case 'update':
-          // Generation update: update the output text.
           setOutput(e.data.output);
           break;
-
         case 'complete':
-          // Generation complete: re-enable the "Translate" button
-          setDisabled(false);
+          setModelLoading(false);
           break;
       }
     };
-
-    // Attach the callback function as an event listener.
     worker.current.addEventListener('message', onMessageReceived);
-
-    // Define a cleanup function for when the component is unmounted.
-    return () => worker.current.removeEventListener('message', onMessageReceived);
+    return () => {
+      worker.current.removeEventListener('message', onMessageReceived);
+    };
   });
 
-  const translate = () => {
-    setDisabled(true);
-    worker.current.postMessage({
-      text: input,
-      src_lang: sourceLanguage,
-      tgt_lang: targetLanguage,
+  useEffect(() => {
+    // Load saved data from localStorage
+    const savedUrl = localStorage.getItem('githubPrUrl');
+    const savedToken = localStorage.getItem('githubToken');
+    if (savedUrl) setValue('githubPrUrl', savedUrl);
+    if (savedToken) setValue('githubToken', savedToken);
+  }, [setValue]);
+
+  const onSubmit = async (data) => {
+    setModelLoading(true);
+    setSubmitting.on();
+
+    localStorage.setItem('githubPrUrl', data.githubPrUrl);
+    localStorage.setItem('githubToken', data.githubToken);
+    localStorage.setItem('baseOwner', data.baseOwner);
+    localStorage.setItem('baseRepo', data.baseRepo);
+    toast({
+      title: 'Data saved.',
+      description: "We've saved your GitHub details.",
+      status: 'success',
+      duration: 5000,
+      isClosable: true,
     });
-  }
+
+    try {
+      const { compareData, diffContent } = await fetchDetails(
+        data.githubPrUrl,
+        data.githubToken
+      );
+      setInput(diffContent);
+      worker.current.postMessage({
+        text: diffContent,
+      });
+    } catch (error) {
+      console.log('=>(App.js:142) error', error);
+      toast({
+        title: 'Error fetching PR details.',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSubmitting.off();
+    }
+  };
 
   return (
-    <>
-      <h1>Transformers.js</h1>
-      <h2>ML-powered multilingual translation in React!</h2>
+    <Center>
+      <VStack spacing="50px" p={4} width={['100%', '800px']}>
+        <Heading variant="h1">ML-powered code reviewer</Heading>
 
-      <div className='container'>
-        <div className='language-container'>
-          <LanguageSelector type={"Source"} defaultLanguage={"eng_Latn"} onChange={x => setSourceLanguage(x.target.value)} />
-          <LanguageSelector type={"Target"} defaultLanguage={"fra_Latn"} onChange={x => setTargetLanguage(x.target.value)} />
-        </div>
+        <Box as="form" onSubmit={handleSubmit(onSubmit)} width="100%">
+          <FormControl isRequired marginBottom={4}>
+            <FormLabel htmlFor="githubPrUrl">GitHub PR URL</FormLabel>
+            <Input
+              id="githubPrUrl"
+              type="url"
+              {...register('githubPrUrl', { required: true })}
+            />
+          </FormControl>
 
-        <div className='textbox-container'>
-          <textarea value={input} rows={3} onChange={e => setInput(e.target.value)}></textarea>
-          <textarea value={output} rows={3} readOnly></textarea>
-        </div>
-      </div>
+          <FormControl isRequired marginBottom={4}>
+            <FormLabel htmlFor="githubToken">GitHub Token</FormLabel>
+            <Input
+              id="githubToken"
+              type="password"
+              {...register('githubToken', { required: true })}
+            />
+            <FormHelperText>
+              You can get your Github token here:{' '}
+              <Link
+                color="blue.500"
+                href="https://github.com/settings/tokens/new"
+                isExternal
+              >
+                Github Token
+              </Link>
+            </FormHelperText>
+          </FormControl>
 
-      <button disabled={disabled} onClick={translate}>Translate</button>
+          <Stack p={4} width="100%">
+            <Center>
+              <Button
+                mt={4}
+                colorScheme="blue"
+                type="submit"
+                isLoading={isSubmitting}
+                isDisabled={isModelLoading}
+                loadingText={
+                  isModelReady ? 'Analyzing...' : 'Loading models...'
+                }
+              >
+                Analyze
+              </Button>
+            </Center>
+            {progressItems.map((data) => (
+              <Progress
+                key={data.file}
+                size="md"
+                text={data.file}
+                value={data.progress}
+              />
+            ))}
+          </Stack>
+        </Box>
 
-      <div className='progress-bars-container'>
-        {ready === false && (
-          <label>Loading models... (only run once)</label>
-        )}
-        {progressItems.map(data => (
-          <div key={data.file}>
-            <Progress text={data.file} percentage={data.progress} />
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
-export default App
+        <Grid
+          templateColumns="repeat(2, 1fr)"
+          gap={6}
+          width="100%"
+          height="500px"
+        >
+          <GridItem textAlign="left" fontSize="xx-small" overflow="auto">
+            <Box height="500px" width="100%">
+              <SyntaxHighlighter
+                language="javascript"
+                style={docco}
+                height="100%"
+              >
+                {input}
+              </SyntaxHighlighter>
+            </Box>
+          </GridItem>
+          <GridItem>
+            <Textarea
+              height="500px"
+              value={output}
+              rows={10}
+              readOnly
+            ></Textarea>
+          </GridItem>
+        </Grid>
+      </VStack>
+    </Center>
+  );
+};

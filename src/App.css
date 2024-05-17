@@ -58,7 +58,7 @@
 
 .progress-bars-container {
   padding: 8px;
-  height: 140px;
+  height: auto;
 }
 
 .container {
