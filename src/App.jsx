@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import Progress from './components/Progress';
 import { useForm } from 'react-hook-form';
 import {
   Button,
@@ -11,9 +10,12 @@ import {
   Grid,
   GridItem,
   Heading,
+  HStack,
   Input,
   Link,
+  Progress,
   Stack,
+  Text,
   Textarea,
   useBoolean,
   useToast,
@@ -111,7 +113,7 @@ export const App = () => {
     });
 
     try {
-      const { compareData, diffContent } = await fetchDetails(
+      const { diffContent } = await fetchDetails(
         data.githubPrUrl,
         data.githubToken
       );
@@ -152,7 +154,7 @@ export const App = () => {
             <FormLabel htmlFor="githubToken">GitHub Token</FormLabel>
             <Input
               id="githubToken"
-              type="password"
+              type="text"
               {...register('githubToken', { required: true })}
             />
             <FormHelperText>
@@ -167,7 +169,7 @@ export const App = () => {
             </FormHelperText>
           </FormControl>
 
-          <Stack p={4} width="100%">
+          <Stack spacing="10px" width="100%">
             <Center>
               <Button
                 mt={4}
@@ -175,20 +177,23 @@ export const App = () => {
                 type="submit"
                 isLoading={isSubmitting}
                 isDisabled={isModelLoading}
-                loadingText={
-                  isModelReady ? 'Analyzing...' : 'Loading models...'
-                }
+                loadingText="Analyzing"
               >
-                Analyze
+                {!isModelReady ? 'Loading models (One time)' : 'Analyze'}
               </Button>
             </Center>
             {progressItems.map((data) => (
-              <Progress
-                key={data.file}
-                size="md"
-                text={data.file}
-                value={data.progress}
-              />
+              <HStack key={data.file} width="100%">
+                <Text fontSize="xx-small" width="300px">
+                  {data.file}
+                </Text>
+                <Progress
+                  size="md"
+                  text={data.file}
+                  value={data.progress}
+                  width="100%"
+                />
+              </HStack>
             ))}
           </Stack>
         </Box>
