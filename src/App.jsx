@@ -154,7 +154,7 @@ export const App = () => {
             <FormLabel htmlFor="githubToken">GitHub Token</FormLabel>
             <Input
               id="githubToken"
-              type="text"
+              type="password"
               {...register('githubToken', { required: true })}
             />
             <FormHelperText>
@@ -166,6 +166,7 @@ export const App = () => {
               >
                 Github Token
               </Link>
+              {`(Need 'repo' and 'user' permissions)`}
             </FormHelperText>
           </FormControl>
 
